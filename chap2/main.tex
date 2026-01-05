@@ -1,0 +1,72 @@
+\renewcommand{\ttdefault}{pxtt}
+\graphicspath{{chap2/figures/}}
+\lstdefinelanguage{boogie}{%
+  keywords={%
+    procedure,var,int,call,return,assert,
+  },
+  morecomment=[l]{//},
+}
+\lstdefinelanguage{llvm}{%
+  keywords={%
+    define,void,alloca,call,bitcast,store,align,to,load,ret,void,getelementptr,icmp,
+    inbounds,eq,
+  },
+  morecomment=[l]{//},
+}
+
+\lstdefinelanguage{rust}{%
+  keywords={%
+    fn,i1,i8,u8,i16,u16,i32,u32,i64,u64,mut,for,in,as,match,struct,let,mod,use,
+    pub,extern,unsafe,bool
+  },
+  morecomment=[l]{//},
+}
+
+
+\newcommand{\lstrust}[1]{\lstset{language=C}\lstinline?#1?}
+\newcommand{\lstllvm}[1]{\lstset{language=llvm}\lstinline?#1?}
+\newcommand{\lstboogie}[1]{\lstset{language=boogie}\lstinline?#1?}
+\newcommand{\rustc}{{rustc}}
+
+\chapter[Verifying Rust Programs with SMACK]{Verifying Rust Programs\\ with SMACK\protect\footnotemark} \footnotetext{Adapted from \textit{Verifying Rust Programs with SMACK}, ATVA 2018~\cite{2018_atva_bhr}. Reproduced with permission from Springer Nature.}
+\label{cha2}
+\setupuuchapterbib
+% \chapter{Verifying Rust Programs with SMACK}
+
+%\author{Marek Baranowski \and Shaobo He \and Zvonimir Rakamari\'c}
+%\institute{
+%  School of Computing, University of Utah, USA \\
+%  \email{\{baranows,shaobo,zvonimir\}@cs.utah.edu}
+%}
+
+%\input{chap2/inputs/abstract}
+
+\vspace{-2.5em}
+
+\section{Introduction}
+\label{sec:introduction}
+\input{chap2/inputs/introduction}
+
+
+% \section{SMACK Software Verification Toolchain}
+% \label{sec:background}
+% \input{chap2/inputs/background}
+
+
+\section{Rust-Driven Extensions to SMACK}
+\label{sec:extensions}
+\input{chap2/inputs/extensions}
+
+
+\section{Experiments}
+\label{sec:experiments}
+\input{chap2/inputs/experiments}
+
+\section{Limitations and Future Work}
+\label{sec:future}
+\input{chap2/inputs/future}
+
+\bibliographystyle{plain}
+\bibliography{refs}
+\newpage
+\input{chap2/inputs/figs}

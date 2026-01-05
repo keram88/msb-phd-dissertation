@@ -1,0 +1,96 @@
+\section{Related Work}
+\label{sec:related-work}
+
+In the past decade, numerous software verifiers have been developed on top of
+the LLVM compiler infrastructure
+(e.g.,~\cite{calysto,divine,saw,seahorn,llbmc,smack-cav}), while
+others leverage GCC in a similar fashion (e.g.,~\cite{Dudka2011,Habermehl2011}).
+%
+The authors of these tools have realized the benefits LLVM offers for the
+development of verifiers, such as a canonical intermediate representation and
+readily available analysis and optimization passes.
+%
+In particular, verifiers such as SAW~\cite{saw}, LLBMC~\cite{llbmc},
+SeaHorn~\cite{seahorn}, and SMACK~\cite{smack-cav} all take as input LLVM
+bitcode produced by the clang compiler, which is then handled differently by
+each verifier.
+%
+SAW (Software Analysis Workbench) uses symbolic execution with path merging to
+produce formal models from LLVM IR in a dependently-typed intermediate
+verification language; it reasons about the resulting models using rewriting or
+external satisfiability solvers.
+%
+LLBMC generates its own intermediate logical representation (ILR) based on the
+input LLVM IR program, and leverages SMT solvers to check the formula derived
+from ILR.
+%
+SeaHorn encodes an input LLVM IR program into Horn clauses, which are further
+solved using different techniques.
+%
+SMACK translates LLVM IR into an intermediate verification language called Boogie,
+which is then verified using different back-end verification engines.
+%
+Both LLBMC and SeaHorn support both C and C++ (to some extent), while SMACK
+has mature support only for C.
+%
+Unlike the aforementioned tools, ESBMC~\cite{esbmc} leverages clang just as a
+parser to obtain ASTs, and it does not use LLVM IR; it supports both C and C++.
+%
+Despite the popularity of LLVM IR in building software verifiers, to the best
+of our knowledge, we are the first to study the feasibility of leveraging an
+intermediate representation to perform multi- and cross-language verification.
+
+
+Some of the languages we considered in this chapter have standalone verifiers.
+%
+For instance, CRUST~\cite{crust} verifies unsafe Rust code by translating a
+Rust program into a C program, and then using an off-the-shelf C verifier.
+%
+Rust2Viper~\cite{rust2viper} and its successor Prusti~\cite{oopsla2019} are
+modular verifiers for Rust programs that include a design-by-contract
+specification language.
+%
+As input they take an annotated program in the Rust's high-level intermediate
+representation, which simplifies and canonicalizes complex language constructs.
+%
+Then, such a program is encoded into the Viper intermediate verification
+language~\cite{viper} for verification.
+%
+These approaches would require substantial effort to support verification of
+other programming languages.
+%
+To the best of our knowledge, there are no verifiers available targeting Swift,
+Kotlin, D, or Fortran.
+
+
+There are software verifiers that process the input languages directly as
+opposed to delegating to a compiler IR.
+%
+For example, CPAchecker~\cite{Beyer2011}, Ultimate
+Automizer~\cite{Heizmann2013}, \\ CBMC~\cite{ClarkeKL04}, SAW~\cite{saw}, and
+CIVL~\cite{civl} all leverage off-the-shelf or custom parsers to generate
+abstract syntax trees (ASTs), and then process these ASTs in various ways to
+carry out verification.
+%
+(Note that CPAchecker, CBMC, and SAW support LLVM IR as well.)
+%
+The verifiers in this category can potentially perform multi-language
+verification, but often at the expense of having to perform some
+language-specific work.
+%
+For example, SAW's work-in-progress support for Rust involves implementing
+a designated symbolic simulator.
+%
+While taking compiler IR as input has its drawbacks over directly handling
+input languages, such as losing type information and precise debugging data, it
+also demonstrates an advantage in the context of multi-language verification
+--- only the details of one language (namely compiler IR) need to be addressed. 
+%
+This implies that supporting a new programming language does not require
+supporting all the new constructs that it brings to the table.
+%
+For example, C++ templates are completely compiled away at the LLVM IR level.
+%
+Instead, only the new program constructs in the IR that are not yet supported,
+but are used by the new language, need to be modeled.
+

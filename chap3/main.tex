@@ -1,0 +1,170 @@
+% \usepackage[table]{xcolor}
+% \usepackage{graphicx}
+% \usepackage{hyperref}
+% \usepackage{listings}
+% \usepackage{pifont}
+% \usepackage{balance}
+% \usepackage{booktabs}
+% \usepackage{arydshln}
+% \usepackage{wrapfig}
+% \usepackage[firstpage]{draftwatermark}
+\graphicspath{{chap3/images/}}
+
+%% artifact evaluation badge
+%% adjust the two parameters to change the location
+% \SetWatermarkText{\raisebox{11.5cm}{%
+% 		\hfill \hspace{8.4375cm} \includegraphics{2-functional}%
+% }}
+% \SetWatermarkAngle{0}
+
+\newcommand{\ra}[1]{\renewcommand{\arraystretch}{#1}}
+
+\newcommand{\cmark}{\ding{51}\xspace}
+\newcommand{\xmark}{\ding{55}\xspace}
+\newcommand{\notapplic}{N/A\xspace}
+
+% \newcommand{\shaobo}[1]{\textcolor{green}{Shaobo sayz: #1}}
+% \newcommand{\zvon}[1]{\textcolor{red}{Zvon sayz: #1}}
+% \newcommand{\marek}[1]{\textcolor{green}{Mark sayz: #1}}
+% \newcommand{\jj}[1]{\textcolor{green}{JJ sayz: #1}}
+
+\renewcommand{\ttdefault}{pxtt}
+
+\lstdefinelanguage{boogie}{%
+  keywords={%
+    procedure,var,int,call,return,assert,
+  },
+  morecomment=[l]{//},
+}
+
+\lstdefinelanguage{llvm}{%
+  keywords={%
+    define,void,alloca,call,bitcast,store,align,to,load,ret,void,getelementptr,icmp,
+    inbounds,eq,
+  },
+  morecomment=[l]{//},
+}
+
+\lstdefinelanguage{swift}
+{
+  morekeywords={
+    func,if,then,else,for,in,while,do,switch,case,default,where,break,continue,fallthrough,return,
+    typealias,struct,class,enum,protocol,var,func,let,get,set,willSet,didSet,inout,init,deinit,extension,
+    subscript,prefix,operator,infix,postfix,precedence,associativity,left,right,none,convenience,dynamic,
+    final,lazy,mutating,nonmutating,optional,override,required,static,unowned,safe,weak,internal,
+    private,public,is,as,self,unsafe,dynamicType,true,false,nil,Type,Protocol,Int
+  },
+  morecomment=[l]{//}, % l is for line comment
+  morecomment=[s]{/*}{*/}, % s is for start and end delimiter
+  morestring=[b]" % defines that strings are enclosed in double quotes
+}
+
+\lstdefinelanguage{rust}{%
+  keywords={%
+    fn,i1,i8,u8,i16,u16,i32,u32,i64,u64,mut,for,in,as,match,struct,let,mod,use,
+    pub,extern,unsafe,bool,if,return,usize
+  },
+  morecomment=[l]{//},
+}
+
+\lstset{
+  breaklines=true,
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+}
+
+% \newcommand{\lstc}[1]{\lstset{language=C,basicstyle=\ttfamily\footnotesize}\lstinline´#1´}
+% \newcommand{\lstrust}[1]{\lstset{language=rust,basicstyle=\ttfamily\footnotesize}\lstinline´#1´}
+\newcommand{\lstswift}[1]
+{\lstset{language=swift}\lstinline?#1?}
+% The above used to have a `´' instead of `?', but none of the examples in this text use the `?', so we'll use that instead to avoid unicode errors.
+%\newcommand{\lstswift}[1]{\lstset{language=swift,basicstyle=\ttfamily\footnotesize}\lstinline´#1´}
+% \newcommand{\lstllvm}[1]{\lstset{language=llvm}\lstinline´#1´}
+% \newcommand{\lstboogie}[1]{\lstset{language=boogie}\lstinline´#1´}
+% \newcommand{\rustc}{{rustc}}
+
+
+% \begin{document}
+\chapter[Leveraging Compiler Intermediate Representation for\\Multi- and
+Cross-Language Verification]{Leveraging Compiler Intermediate Representation for Multi- and
+Cross-Language Verification\protect\footnotemark} \footnotetext{Adapted from \textit{Leveraging Compiler Intermediate Representation for Multi- and Cross-Language Verification}, VMCAI 2020~\cite{2020_vmcai_gbhr}. Reproduced with permission from Springer Nature.}
+\label{cha3}
+\setupuuchapterbib
+% \thanks{This work was supported by funding from the
+% Undergraduate Research Opportunities Program at the University of Utah awarded
+% to Jack J.~Garzella, the National Science Foundation awards CNS 1527526 and CCF
+% 1837051, and a gift from the VMware's University Research Fund.}}
+
+% \titlerunning{Leveraging Compiler IR for Multi- and
+% Cross-Language Verification}
+
+% \author{Jack J.~Garzella \and Marek Baranowski \and Shaobo He \and Zvonimir Rakamari\'c}
+% \institute{
+%   School of Computing, University of Utah \\
+%   Salt Lake City, UT, USA \\
+%   \email{jjgarzella@gmail.com,\\
+%   \{baranows,shaobo,zvonimir\}@cs.utah.edu}
+% }
+
+% \authorrunning{J.~J.~Garzella \and M.~Baranowski \and S.~He \and Z.~Rakamari\'c}
+
+% \maketitle
+%\marek{Is the lncs abstract necessary in this? It seems redundant with the introduction. The thesis template says implies it's rude to not have text here though.}
+% \begin{abstract}
+% %
+% Developers nowadays regularly use numerous programming languages with different
+% characteristics and trade-offs.
+% %
+% Unfortunately, implementing a software verifier for a new language from scratch
+% is a large and tedious undertaking, requiring expert knowledge in multiple
+% domains, such as compilers, verification, and constraint solving.
+% %
+% Hence, only a tiny fraction of the used languages has readily available
+% software verifiers to aid in the development of correct programs.
+% %
+% In the past decade, there has been a trend of leveraging popular compiler
+% intermediate representations (IRs), such as LLVM IR, when implementing software
+% verifiers.
+% %
+% Processing IR promises out-of-the-box multi- and cross-language
+% verification since, at least in theory, a verifier ought to be able to handle a
+% program in any programming language (and their combination) that can be
+% compiled into the IR.
+% %
+% In practice though, to the best of our knowledge, nobody has explored the
+% feasibility and ease of such integration of new languages.
+% %
+% In this paper, we provide a procedure for adding support for a new
+% language into an IR-based verification toolflow.
+% %
+% Using our procedure, we extend the SMACK verifier with prototypical support for
+% 6 additional languages.
+% %
+% We assess the quality of our extensions through several case studies, and we
+% describe our experience in detail to guide future efforts in this area.
+% %
+%\keywords{Verification \and Multi-Language \and Cross-Language \and Compiler
+%Intermediate Representation.}
+%
+%\end{abstract}
+
+%\begin{IEEEkeywords}
+%verification, multi-language, cross-language, compiler intermediate representation
+%\end{IEEEkeywords}
+\vspace{-2em}
+\input{chap3/introduction}
+\input{chap3/related-work}
+\input{chap3/background}
+\input{chap3/procedure}
+\input{chap3/evaluation}
+\input{chap3/experience}
+\input{chap3/conclusions}
+
+\bibliographystyle{plain}
+\bibliography{refs}
+\newpage
+\input{chap3/figures}
+% \bibliographystyle{splncs04}
+% \bibliography{refs}
+
+% \end{document}
+

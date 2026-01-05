@@ -1,0 +1,43 @@
+%%% -*-LaTeX-*-
+%%% This is the abstract for the thesis.
+%%% It is included in the top-level LaTeX file with
+%%%
+%%%    \preface    {abstract} {Abstract}
+%%%
+%%% The first argument is the basename of this file, and the
+%%% second is the title for this page, which is thus not
+%%% included here.
+%%%
+%%% The text of this file should be about 350 words or less.
+
+This dissertation presents an exploration into multi-language program verification using the SMACK software verification toolchain, with a focus on integrating the Rust programming language.
+%
+Initially, we extend SMACK to support verification of Rust programs by leveraging its use of the low-level virtual-machine intermediate-representation (LLVM IR).
+%
+We then build upon this foundation to add support for verifying programs written in additional languages targeting LLVM IR.
+%
+By extending SMACK to support verification of mixed-language programs, we aim to support scenarios where programs in multiple languages (e.g., C and Rust) interact.
+%
+We apply these extensions to prove correctness properties of programs written in these programming languages, and we prove correctness of programs written in multiple languages.
+%
+Properties we prove include showing the correctness of the use of libraries between programming languages and equivalence of code written in different programming languages.
+
+More specifically, there are several problems that motivate this work.
+%
+Rust programs cannot ensure safety of so-called \textit{unsafe code}, which is code that the compiler cannot show to be free of memory errors.
+%
+SMACK is used to show that an interface using unsafe functionality exposes a safe abstraction.
+%
+Rust programs can be proven to have correct behavior such as in an information-control-flow implementation.
+%
+Multi-language extensions to SMACK are used to check the correctness of a library written in Rust against a reference implementation written in C.
+%
+This exercise found that the Rust library was mostly correct, but we discovered two bugs in its implementation.
+%
+Finally, SMACK is applied to prove the equivalence of a number of functions in a Rust-language port of a math library originally written in C.
+%
+In this work, SMACK shows the correct implementation of most ported functions and identifies some bugs.
+
+Together, this work on SMACK transforms it from a software verifier for C-language programs, into a software verifier capable of verifying programs written in multiple programming languages and programs that use code written in different programming languages.
+%
+These extensions to SMACK enable it to prove correct program behavior of programs that use more than one programming language and to prove equivalence of programs ported between programming languages.

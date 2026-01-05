@@ -1,0 +1,196 @@
+\section{Experiments}
+
+For this work we chose to check the equivalence of the Rust implementation of a
+libm by the Rust developers.
+%
+This library is a native, and idiomatic, Rust language reimplementation of the
+\texttt{musl} libm~\cite{musl} library.
+%
+The \texttt{musl} library provides C-language implementations of IEEE 754 math functions.
+%
+The version of the \texttt{musl} library used in this work is version 1.1.19.
+
+The Rust libm library is popular, with over fifty million
+downloads~\cite{libm-crate} as a package, and it has more than two hundred
+dependent packages~\cite{libm-dependents}.
+%
+This library features the use of for loops, and bit-wise floating-point and
+integer operations.
+%
+The average SLoC is 66.
+%
+Together, this library has real-world users, has clear targets for verifying
+equivalence and are programs of modest size and complexity, and are a good
+target on which to use SMACK to check for equivalence.
+
+We have three categories of benchmarks: SMACK-library, basic and advanced.
+%
+The SMACK-library category includes the functions in the math library that correspond to library functions provided by SMACK.
+%
+Most of these functions are implemented in terms of SMT solver primitives.
+%
+For these benchmarks, we also check for equivalence between the Rust, \texttt{musl} and SMACK versions of the functions.
+%
+This gives an additional benefit of checking that SMACK's math library is correct.
+
+A second category of benchmarks are those that don't require much intervention to verify.
+%
+The third category is the advanced functions that required advanced methods to help the solver verify, meaning they would take at least an hour to verify.
+
+The functions we worked to verify have several features that influence how hard a program will be for SMACK to verify, and how much manual annotation or modularization 
+%
+Functions that use bit-wise operations on floating point numbers tend to take longer to verify due to mixing theories, which may limit the solver's ability to use floating-point theory specific reasoning.
+%
+Functions with multiple branches tend to be slower to prove equivalence due to a lower ability for the solver to detect similar structure between the programs.
+%
+
+The basic benchmarks are shown in in~\cref{tab:rustmusl}, the comparison between Rust and SMACK is in~\cref{tab:rustsmack} and the comparison between \texttt{musl} and SMACK is in~\cref{tab:muslsmack}.
+%
+The advanced benchmarks are shown in~\cref{tab:advancedbench}.
+
+In the basic benchmarks, we can see that Corral with Z3 is the worst performing verifier due to its worse performance on many benchmarks.
+%
+Boogie with Z3 is the most consistent performing verifier, verifying all but one benchmark in the time limit, which is 1200s.
+%
+
+In the comparisons between Rust and SMACK, we see that Boogie with CVC5 is the best performing verifier, solving all queries under the time limit of 1200s.
+%
+Boogie with Z3 is the next best performing verifier, with Corral behind it.
+%
+In the comparison between \texttt{musl} and SMACK, all three perform worse.
+%
+This is notable because the SMACK library versions of these functions are written in C and Boogie.
+%
+It may be that Rust code is easier for the solver to check equivalence with the Boogie code than it is for C.
+
+In the advanced functions, Boogie with Z3 is the best performing solver, solving all benchmarks in their time limits.
+%
+Boogie with CVC5 is the next best, solving two benchmarks, then Corral solving no benchmarks.
+%
+This is partially due to using Boogie with Z3 for gauging the difficulty of equivalence checks, rather than doing the same with Corral or Boogie with CVC5.
+
+All benchmarks were conducted on an Intel 12900ks@5.2GHz, with 16 performance cores and 64GB of memory.
+%
+The versions of the software used were: Z3 version 4.8.12, CVC5 version 1.0.5, Boogie version 2.9.6 and Corral version 1.1.8.
+%
+The benchmark suite is available at: \url{https://github.com/keram88/libm-equiv}.
+%
+The modifications to SMACK are available at: \url{https://github.com/smackers/smack/tree/equiv}
+% \begin{table}[!htp]\centering
+% \caption{Rust and \texttt{musl} equivalence results}\label{tab:rustmusl}
+% \begin{tabular}{lrrrrrrrr}\toprule
+% Name &Status & Boogie/CVC5 &Boogie/Z3&Corral&Unroll &Inputs &SLoC \\\midrule
+% ceil & Equivalent & TO & 86.4$\pm$1.78s&TO &N/A &(f64) &88 \\
+% ceilf &Equivalent & TO &2.2$\pm$0.07s &2.6$\pm$0.03s &N/A &(f32) &76 \\
+% copysign &Equivalent & 5.4$\pm$0.51s &1.5$\pm$0.03s &3$\pm$0.06s &N/A &(f64, f64) &15 \\
+% copysignf &Equivalent & 2.4$\pm$0.26s &1.4$\pm$0.06s &2.2$\pm$0.06s &N/A &(f32, f32) &17 \\
+% fabs &Equivalent & 2.7$\pm$0.22s &1.9$\pm$0.05s &5.6$\pm$0.15s &N/A &(f64) &38 \\
+% fabsf &Equivalent & 2.0$\pm$0.19s &1.6$\pm$0.04s &2.5$\pm$0.09s &N/A &(f32) &38 \\
+% fdim &Equivalent & 5.8$\pm$0.18s &1.6$\pm$0.04s &9.2$\pm$0.06s &N/A &(f64, f64) &22 \\
+% fdimf &Equivalent & 5.0$\pm$0.18s&1.6$\pm$0.03s &3.1$\pm$0.07s &N/A &(f32, f32) &22 \\
+% floor &Equivalent & TO & 113.5$\pm$2.85s &TO &N/A &(f64) &87 \\
+% floorf &Equivalent &  TO &3.2$\pm$0.07s &3.5$\pm$0.12s &N/A &(f32) &77 \\
+% fmax &Equivalent & 4.7$\pm$0.22s &6.2$\pm$0.11s &52.4$\pm$2.69s &N/A &(f64, f64) &15 \\
+% fmaxf &Equivalent & 3.3$\pm$0.07s&2.8$\pm$0.11s &7.9$\pm$0.04s &N/A &(f32, f32) &15 \\
+% fmin &Equivalent & 4.9$\pm$0.12s &21.5$\pm$0.34s &110.7$\pm$2.96s &N/A &(f64, f64) &15 \\
+% fminf &Equivalent & 3.1$\pm$0.18s&7.4$\pm$0.15s &8.8$\pm$0.22s &N/A &(f32, f32) &15 \\
+% fmod &Equivalent & TO &22.9$\pm$0.64s &83$\pm$0.91s &2 &(f64, f64) &128 \\
+% fmodf &Equivalent & TO &183.4$\pm$3.5s &366.9$\pm$5.12s &2 &(f32, f32) &129 \\
+% frexp &Equivalent & TO & 22.8$\pm$0.85s &TO &3 &(f64, i32) &38 \\
+% frexpf &Equivalent & TO& 10.5$\pm$0.08s &TO &3 &(f32) &39 \\
+% ilogb &Equivalent & 3.0$\pm$0.16s &1.4$\pm$0.09s &2.5$\pm$0.06s &N/A &(f64) &52 \\
+% ilogbf &Equivalent & 2.9$\pm$0.17s &1.8$\pm$0.03s &3$\pm$0.1s &N/A &(f32) &52 \\
+% modf &Equivalent & TO & 53.2$\pm$0.92s &TO &N/A &(f64) &55 \\
+% modff &Equivalent & TO & 60.1$\pm$1.45s &TO &N/A &(f32) &56 \\
+% nextafter &Equivalent & TO &44.3$\pm$0.77s &12.3$\pm$0.41s &N/A &(f64, f64) &59 \\
+% nextafterf &Equivalent & TO &28.2$\pm$0.21s &11.1$\pm$0.37s &N/A &(f32, f32) &58 \\
+% remquo &Equivalent & TO & 210.8$\pm$4.25s &TO &1 &(f64, f64) &164 \\
+% remquof &Equivalent & TO & 363.3$\pm$10.35s &TO &2 &(f32, f32) &164 \\
+% rint &Equivalent & 7.5$\pm$0.40s &12.1$\pm$0.28s &50.8$\pm$0.69s &N/A &(f64) &68 \\
+% rintf &Equivalent & 3.1$\pm$0.15s &5.4$\pm$0.15s &9.9$\pm$0.16s &N/A &(f32) &70 \\
+% round & Equivalent & 434$\pm$14.47s&TO &TO &N/A &(f64) &55 \\
+% roundf &Equivalent & 61.6$\pm$2.3s &285$\pm$7.25s &237$\pm$6.84s &N/A &(f32) &58 \\
+% scalbn &Equivalent & 21.8$\pm$1.45s &207.8$\pm$3.6s &652$\pm$11.79s &N/A &(f64, i32) &58 \\
+% scalbnf &Equivalent & 8.2$\pm$0.225s &34.1$\pm$0.64s &62.3$\pm$1.91s &N/A &(f32, i32) &57 \\
+% trunc &Equivalent & 6.8$\pm$0.28s & 2.56$\pm$0.05s &TO &N/A &(f64) &50 \\
+% truncf &Equivalent & 2.1$\pm$0.11s&25.3$\pm$0.21s &15.1$\pm$0.25s &N/A &(f32) &51 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}\
+
+% \begin{table}[!htp]\centering
+% \caption{Rust checked against SMACK}\label{tab:rustsmack}
+% \begin{tabular}{lrrrrr}\toprule
+% Function Name &Status &Boogie/CVC5 Time &Boogie/Z3 Time &Corral Time \\\midrule
+% ceil &Equivalent &1012.3$\pm$22.71s &TO &TO \\
+% ceilf &Equivalent &2.2$\pm$0.18s &12.6$\pm$0.89s &4.3$\pm$0.29s \\
+% copysign &Equivalent &4.4$\pm$0.11s &2.3$\pm$0.09s &17.4$\pm$0.35s \\
+% copysignf &Equivalent &2.2$\pm$0.17s &2$\pm$0.25s &4.4$\pm$0.31s \\
+% fabs &Equivalent &2$\pm$0.17s &2.1$\pm$0.08s &2.3$\pm$0.13s \\
+% fabsf &Equivalent &1.9$\pm$0.16s &2$\pm$0.26s &2.3$\pm$0.14s \\
+% floor &Equivalent &800.3$\pm$78.76s &TO &TO \\
+% floorf &Equivalent &2.5$\pm$0.04s &10.9$\pm$0.49s &4.9$\pm$0.26s \\
+% fmax &Equivalent &2.1$\pm$0.07s &15.7$\pm$0.16s &TO \\
+% fmaxf &Equivalent &2.1$\pm$0.02s &6.8$\pm$0.08s &83.4$\pm$1.01s \\
+% fmin &Equivalent &2.1$\pm$0s &61.2$\pm$2.58s &150.9$\pm$1.43s \\
+% fminf &Equivalent &2.2$\pm$0.11s &6.6$\pm$0.32s &15.8$\pm$0.31s \\
+% fmod &Error (Expected) &590.9$\pm$1.15s &TO &TO \\
+% fmodf &Error (Expected) &20.4$\pm$0.38s &113.5$\pm$15.5s &260.5$\pm$4.27s \\
+% modf &Equivalent &4.9$\pm$0.05s &132.7$\pm$6.09s &TO \\
+% modff &Equivalent &5$\pm$0.03s &52.8$\pm$5.69s &145.2$\pm$9.82s \\
+% rint &Equivalent &11.8$\pm$0.06s &302.7$\pm$6.16s &781.8$\pm$186.03s \\
+% rintf &Equivalent &3.9$\pm$0.16s &28.3$\pm$1.98s &76$\pm$0.05s \\
+% round &Equivalent &5.7$\pm$0.01s &77.8$\pm$2.86s &227.4$\pm$2.14s \\
+% roundf &Equivalent &3.2$\pm$0.11s &12.9$\pm$0.47s &62.2$\pm$3.85s \\
+% trunc &Equivalent &2.3$\pm$0.12s &62.8$\pm$4.77s &14$\pm$0.04s \\
+% truncf &Equivalent &2.2$\pm$0.08s &18.9$\pm$0.73s &3.6$\pm$0.09s \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+% \begin{table}[!htp]\centering
+% \caption{musl checked against SMACK}\label{tab:muslsmack}
+% \begin{tabular}{lrrrrr}\toprule
+% Function Name &Status &Boogie/CVC5 Time &Boogie/Z3 Time &Corral Time \\\midrule
+% ceil &TO &TO &TO &TO \\
+% ceilf &Equivalent &TO &8$\pm$0.26s &5.6$\pm$0.11s \\
+% copysign &Equivalent &9.6$\pm$0.86s &2.7$\pm$0.13s &14.3$\pm$0.41s \\
+% copysignf &Equivalent &2.9$\pm$0.21s &2$\pm$0.19s &5.1$\pm$0.14s \\
+% fabs &Equivalent &2.5$\pm$0.13s &3.5$\pm$0.12s &6.2$\pm$0.37s \\
+% fabsf &Equivalent &2.1$\pm$0.14s &2.1$\pm$0.04s &4.1$\pm$0.25s \\
+% floor &TO &TO &TO &TO \\
+% floorf &Equivalent &TO &7.5$\pm$0s &5.9$\pm$0.04s \\
+% fmax &Equivalent &4.5$\pm$0.2s &2.1$\pm$0.02s &4.2$\pm$0.04s \\
+% fmaxf &Equivalent &3.1$\pm$0.1s &2.1$\pm$0.16s &3.6$\pm$0.15s \\
+% fmin &Equivalent &4.5$\pm$0.01s &2.1$\pm$0.12s &4$\pm$0.11s \\
+% fminf &Equivalent &3.2$\pm$0.13s &2.2$\pm$0.04s &3.7$\pm$0.05s \\
+% fmod &Error (Expected) &450.7$\pm$12.14s &TO &TO \\
+% fmodf &Error (Expected) &44.2$\pm$2.1s &403.2$\pm$0.59s &TO \\
+% modf &TO &TO &TO &TO \\
+% modff &TO &TO &TO &TO \\
+% rint &Equivalent &21.7$\pm$1.64s &225.9$\pm$29.59s &641.2$\pm$159.96s \\
+% rintf &Equivalent &5$\pm$0.13s &32.8$\pm$0.3s &81$\pm$3.81s \\
+% round &Equivalent &395.7$\pm$58.92s &TO &TO \\
+% roundf &Equivalent &51.3$\pm$0.64s &213.4$\pm$18.85s &795.1$\pm$194.6s \\
+% trunc &Equivalent &7.7$\pm$0.32s &12.9$\pm$0.54s &16.1$\pm$0.32s \\
+% truncf &Equivalent &3.2$\pm$0.01s &4.4$\pm$0.11s &4.5$\pm$0.15s \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+% \begin{table}[!htp]\centering
+% \small
+% \caption{Advanced benchmarks}\label{tab:advancedbench}
+% \begin{tabular}{lrrrrrrr}\toprule
+% Function &Status &Boogie/CVC5 Time &Boogie/Z3 Time &Corral Time &Inputs &SLoC \\\midrule
+% acosf &Equivalent &TO &855.6$\pm$17.81s &TO &(f32) &94 \\
+% cbrtf &Equivalent &TO &2923.6$\pm$38.05s &TO &(f32) &57 \\
+% k\_cos &Equivalent &86.4$\pm$1.61s &14.1$\pm$0.65s &TO &(f64, f64) &27 \\
+% k\_cosf &Equivalent &18.4$\pm$0.11s &18.8$\pm$0.8s &TO &(f64) &21 \\
+% k\_tanf &Equivalent &TO &30$\pm$0.72s &TO &(f64) &34 \\
+% logf &Equivalent &TO &998.3$\pm$15.19s &TO &(f32) &78 \\
+% log10f &Equivalent &TO &876.3$\pm$28.17s &TO &(f32) &107 \\
+% log2f &Equivalent &TO &1176.9$\pm$29.62s &TO &(f32) &102 \\
+% \bottomrule
+% \end{tabular}
+% \end{table}

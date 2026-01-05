@@ -1,0 +1,315 @@
+
+\lstset{numbers=left,xleftmargin=2.5em}
+
+
+%\zvon{Replace SmackVec with just Vec in the example. SmackVec will
+%be confusing.} 
+% Done
+% \zvon{Change the font of the source code to match the one in this
+% paper: http://soarlab.org/publications/cav2014-re.pdf. I think I
+% did something when I moved the figure that changed its font.
+% I don't like its current font.}
+% Done
+
+% \zvon{In this paragraph describe all interesting features of the
+% example that are supported by SMACK. Refer to them in the example
+% using line numbers. Do not hard-code them, but use labels, like
+% I did with nondet below.}
+% \zvon{Also say that we can do verification of programs that
+% combine Rust and C.}
+% Done and done.
+\Cref{fig:crossfib} gives a Rust program illustrating
+the language features that our SMACK extensions leverage or support.
+%
+%The Rust program on the left employs the vector library to implement the
+%Fibonacci function using dynamic programming (lines
+%\ref{code:fib_start}--\ref{code:fib_end}) and checks the equivalence between
+%the Rust implementation \texttt{fib} and the C implementation \texttt{fib\_c}
+%on the right.
+%
+Rust's foreign function interface (FFI) allows zero-cost interaction
+with C code, verification of which had already been extensively supported by
+SMACK.
+%
+As a result, we are able to reuse SMACK's C models as well as perform
+cross-language verification of Rust programs containing calls to
+external C functions (\cref{code:ffi}).
+%
+For example, we implemented macros \texttt{assume} (\cref{code:assume}) and \texttt{assert}
+(\cref{code:assert}) to expand into calls to SMACK's built-in C functions.
+%
+\
+\Cref{code:nondet} invokes the \lstrust{nondet} function that introduces
+nondeterministic unconstrained values.
+%
+Note that we implemented these so that programs can be easily compiled into
+executables even with SMACK annotations present --- in that case \lstrust{nondet}
+is replaced with value \lstrust{5} in the example.
+
+
+Instead of being undefined or triggering wrap-around behaviors as in C,
+integer overflows in Rust are checked and can lead to \emph{program panic}.
+%
+For example, while not visible at the source level, the signed integer addition
+operation at \cref{code:overflow} may optionally be checked for integer
+overflows via the Rust compiler emitting LLVM arithmetic with overflow
+intrinsics~\cite{llvm-intrinsics}; we had to extend SMACK to support such
+intrinsics.
+%
+Finally, unlike C, standard libraries and modern language constructs such as the
+\texttt{Vec} library (\cref{code:mkvec}) and iterators (\cref{code:iterator}) are abundant in Rust
+code.
+%
+Modeling these libraries and language constructs is challenging yet essential
+to build a practical Rust verifier; SMACK's modeling mechanism allowed us
+to implement models for common Rust libraries.
+%
+We describe some of these extensions in more detail next.
+
+%The \texttt{nondet()} method invoked in
+%\cref{code:nondet} produces an arbitrary value when the program is
+%verified by SMACK, but the concrete value 5 is used when compiled by
+%\texttt{rustc}. Further, the \texttt{assume} macro
+%(\cref{code:assume}) places constraints on what values the variable
+%\texttt{n} may take, and the \texttt{assert} macro calls
+%(\cref{code:assert}) SMACK's built-in assert function, these become an
+%empty statement and Rust's built-in assert respectively when compiled
+%with \texttt{rustc}. \Cref{code:mkvec} shows the creation of our
+%modeled \texttt{Vec} class using a convenience macro of length
+%\texttt{n+1}, and \cref{code:vectoridx} shows indexed assignment to
+%the vector. Finally, \cref{code:ffi} invokes the C program's
+%\texttt{fib\_c} function in order the two implementations. While not
+%visible at the source level, \cref{code:overflow} may optionally be
+%checked for overflow.
+
+
+
+%% Rust provides a foreign function interface (FFI) which allows for
+%% external function declarations with a syntax similar to C function
+%% declarations. It is relatively simple to call these functions by
+%% wrapping the function call in an {\tt unsafe} block. This allows us to
+%% include SMACK's {\tt assert, assume} and {\tt nondet} functions in a
+%% Rust program with relative ease. Rust considers locally defined macros
+%% before other macros, allowing us to override the {\tt assert!} macro
+%% to call SMACK's assert function. We implemented other macros such as
+%% {\tt assume!} and {\tt nondet!} to constrain variables and produce
+%% nondeterministic values respectively. Types in Rust are also flexible
+%% in that new methods can be added to existing types through a type
+%% trait. This allows us to implement a {\tt nondet} method for the
+%% integer types in Rust. We combined the above features with Rust's
+%% configuration system to allow Rust programs to transparently use SMACK
+%% related extensions. For example, the statement \lstrust{let a = 7i32.nondet();}
+%% will set \lstrust{a} to 7 when compiled normally, but \lstrust{a} will
+%% have a nondeterministic value when the program is checked in SMACK.
+
+
+
+% For Rust, the SMACK frontend invokes rustc to generate the LLVM IR.
+
+
+%\subsection{Modifying the SMACK Toolflow}
+%\label{sec:pipeline}
+%
+%In order to begin our investigation into integrating support for Rust
+%programs in SMACK we had to make basic transformations to some parts
+%of the LLVM IR code. These are:
+%\begin{itemize}
+%\item The \texttt{main} function generated by \rustc{} first calls a
+%setup function before calling the program's true \texttt{main}
+%function. We transformed the main function to call the
+%real \texttt{main} function directly.
+%\item Rust handles errors by invoking the \texttt{panic} function. The behavior
+%of this function is to unwind the stack, similar to the way exceptions
+%are handled in C++. However, Rust defines a panic as unrecoverable and
+%terminates the program after it is invoked. We tranform panic calls
+%into assertion failures with an annotation which indicates the program
+%panicked.
+%\item The Rust compiler emits the LLVM intrinsic \lstllvm{llvm.expect} which
+%is an optimization hint. We modified SMACK to effectively tranform a call
+%to this function to do nothing.
+%\end{itemize}
+
+
+\subsection{Supporting Rust-Generated LLVM IR Constructs}
+\label{sec:llvm}
+
+
+The LLVM IR code that \rustc{} emits contains several key constructs that are not
+used in IR code produced by Clang.
+%
+Hence, we had to extend SMACK to add support for such constructs.
+%
+The Rust extensions to are highlighted by the dashed bordered boxes in \cref{fig:atvatoolflow}.
+
+\subsubsection{Error Handling}
+Rust handles errors by invoking the \texttt{panic} function. The behavior
+of this function is to unwind the stack, similar to the way exceptions
+are handled in C++. However, Rust defines a panic as unrecoverable and
+terminates the program after it is invoked. We transform panic calls
+into assertion failures with an annotation indicating the program
+panicked.
+
+% i1 and struct return
+\subsubsection{Types}
+%
+The Rust compiler generates load/store instructions of the LLVM
+\lstllvm{i1} data type, which is almost never emitted by Clang.
+%
+We added support for such instructions by zero-extending their operands to
+\lstllvm{i8} when a store operation occurs, and casting them back when they are
+loaded.
+%
+%This works for both the integer and bit-vector modes of Boogie.
+%
+
+Instructions operating on LLVM structure types occur frequently in
+rustc-generated IR code, while Clang-generated IR almost always uses only
+primitive types.
+%
+For example, it is a common practice for Rust programmers to use the
+\lstrust{Option} type as the return type of functions.
+%
+It is generic over type \lstllvm{T} and represented in LLVM IR as
+structure type \lstllvm{\{T,i1\}}, where setting \lstllvm{i1} is used to
+indicate a valid return value.
+%
+%Hence, returning LLVM structures from functions is common in the LLVM
+%IR code of Rust programs.
+%
+Moreover, load/store instructions over structures are frequently generated by
+rustc, but not by Clang.
+%
+Hence, SMACK did not have an elaborate support for such instructions.
+
+
+We support such instructions by modeling LLVM structure types using
+uninterpreted functions that constrain each field.
+%
+For example, value \lstllvm{\{v,1\}} of type \lstllvm{\{T,i1\}} is
+represented using an integer \lstboogie{s} with constraint \lstboogie{f(s,0)==v
+&& f(s,1)==1}, where \lstboogie{f} is an uninterpreted function with the second
+argument being the index of a structure field.
+%
+Such encoding allows us to model two basic LLVM structure instructions
+\lstllvm{extractvalue} and \lstllvm{insertvalue} that read and write structure
+fields, respectively.
+%
+Loads and stores of structures into memory are recursively translated into a sequence of
+instructions that generate load/store for each field of primitive type, in conjunction with
+the two aforementioned instructions.
+%
+%We extended SMACK to handle such constructs by first recursively flattening
+%the
+%structure type into a sequence of primitive types.
+%
+%Then, we extend the function signature with ``out parameters'' capturing
+%the flattened structure.
+%
+%Finally, we instrument function returns so that the return values
+%are extracted from a structure and placed into the out parameters;
+%we also instrument function calls to read from the out parameters
+%and store the read values into the respective structure.
+%
+This extension enables SMACK to handle structure constructs without
+us having to introduce extensive modifications to its underlying memory model.
+
+\subsubsection{Integer Packing}
+%
+The Rust compiler frequently packs smaller structures into 8-byte integers.
+%
+For example, rustc optimizes loading of a structure of type \lstllvm{\{i32,i32\}} into
+loading of \lstllvm{i64}.
+%
+This requires less scalable bit-precise reasoning to be selected in
+SMACK to avoid false bugs~\cite{aplas2017}.
+%
+Hence, we added an analysis pass to SMACK that detects load/store
+instructions with pointer operands of integer element type that refer to
+structures.
+%
+We translate such instructions to load/store directly from/into structure fields
+(following the encoding described earlier),
+thereby essentially avoiding packing.
+%
+This approach helps to scale the verification of Rust programs by avoiding the
+need for bit-precise reasoning.
+
+\subsubsection{Intrinsics}
+%
+We added support for two types of LLVM intrinsics heavily used by \rustc{}:
+\lstllvm{llvm.expect} and arithmetic with overflow.
+%
+The Rust compiler emits the LLVM intrinsic \lstllvm{llvm.expect} as an
+optimization hint. We modified SMACK to transform a call to this intrinsic into
+essentially a no-op.
+%
+As future work, we will explore leveraging such hints to speed up
+verification.
+
+
+\lstset{numbers=left,xleftmargin=1.9em}
+
+
+The Rust compiler typically emits instructions for checking all integer
+operations for overflow through the use of LLVM arithmetic with overflow
+intrinsics, such as \lstboogie{llvm.uadd} \lstboogie{.with.overflow.i32}.
+%
+The intrinsics indicate the sign and bitwidth in which to perform the given
+operation.
+%
+We extended SMACK with an integer overflow checking pass that replaces
+the intrinsics with instruction sequences implementing
+the corresponding overflow checking.
+%
+\Cref{fig:overflow} shows an example translation:
+\begin{itemize}
+%\item On line 1, we first remove the checked overflow intrinsic.
+\item Lines 2 and 3 extend the precision of the arguments to double the original bitwidth,
+thereby avoiding potential overflow.
+\item Line 4 computes the result of the addition, while line 5 converts the result
+back to the original bitwidth.
+\item Line 6 determines whether the operation overflowed, while line 7 checks it.
+\end{itemize}
+%
+Note that the translation shown in \Cref{fig:overflow} is not optimal for dynamic checking since we optimized it for SMT-based verification with SMACK.
+%
+Furthermore, while the conversion of the intrinsic is always performed, checking is made optional following the convention that it is disabled in the release mode.
+%% The overflow instructions indicate the signed-ness of
+%% the operands, so we can always find the correct bounds for the
+%% operation given the sign, e.g., \lstllvm{uadd} versus \lstllvm{sadd},
+%% and the given bitwidth. If we do not consider overflow to be an
+%% error, then we skip the result comparison and set \lstboogie{\$flag :=
+%% true;}
+
+
+
+\subsection{Modeling Rust Libraries}
+
+Standard Rust libraries define most of the language's containers as generic
+over the contained type, and generate the corresponding code for the
+container when the program is compiled.
+However, the generated code is heavily optimized for performance,
+and contains constructs and functions that are difficult for
+SMACK to analyze, such as custom allocators.
+Hence, we leveraged SMACK's existing modeling capabilities to
+write models for popular Rust data structures, such as vector (\lstrust{Vec}).
+Vector is a dynamically-sized array used in many Rust programs as well as
+for implementing other data structures such
+as stacks and queues.
+%
+Currently, our vector model supports dynamic resizing, push, pop, get and
+mutable get, and indexing among other features.
+%
+The model resides in a separate file, which SMACK automatically links as a Rust
+module.
+
+
+%\texttt{smack.rs} includes function declarations for SMACK's raw verification
+%functions through Rust's foreign function intefrace (FFI). This file
+%constitutes the ``Rust models'' component and provides access to these
+%functions through macros (e.g., \lstrust{assert!}
+%and \lstrust{assume!}) and convenience methods implemented to
+%introduce nondeterministic integers through the \lstrust{nondet}
+%method. Of note, the model file is written to be compiled
+%conditionally, allowing for Rust programs to be compiled normally with
+%SMACK annotations present.

@@ -1,0 +1,31 @@
+\vspace{-2.5em}
+\section{Introduction}
+Rust is a modern programming language focused on safety and native performance.
+%
+Due to Rust's novelty, it has been reliant on libraries written in other programming languages, often C, to provide many core functions.
+%
+However, languages such as C do not have the same safety guarantees provided by Rust and are thus unsafe to use inside Rust.
+%
+Many libraries provide safe Rust bindings to such C language libraries.
+%
+But this requires the library developer to completely contain any potential unsafety within their library.
+%
+Additionally, the foreign code used in this process may not be as optimizable as native Rust code, such as allowing inlining, and may inhibit debugging of such programs from Rust.
+
+An alternative option is to instead port the library code from the source language to Rust.
+%
+This has the upside of making the library native for Rust programs, and limits or eliminates unsafe code used inside the library.
+%
+Nonetheless, such ports may not always be correct because of subtleties related to the source programming language.
+%
+This can be exacerbated by the usage of floating-point arithmetic, which introduces additional subtleties that may not be as well known.
+%
+Moreover, languages may not have complete support for floating-point arithmetic, which may lead to bugs that are difficult to detect within the language itself.
+
+Formal equivalence checking can provide a solution here because it can show that the original-language program matches the behavior of the program ported to the target programming language.
+%
+In this work, we apply the SMACK (please refer to \cref{sec:smackground}) software verifier to the Rust-language port of the \texttt{musl} C-language math library.
+%
+SMACK is a software verifier that can work with both C and Rust language programs at once.
+%
+We give our experiences using SMACK to show the equivalence of these programs and our extensions to the SMACK verifier to help show equivalence of more programs.

@@ -1,0 +1,67 @@
+% We developed numerous Rust programs which test simple language
+% features. These tests exercise the features described in \Cref{tab:benchmarks}.
+% %Some particularly interesting tests are:
+% An interesting test-case is \texttt{closure.rs} which creates a
+% closure which captures a local integer variable mutably in order to
+% change its value through addition. The closure is passed to another
+% function and invoked, increasing the variable's value by one. SMACK
+% successfully verifies this example.
+%% \begin{itemize}
+%% \item The \texttt{closure.rs} test creates a closure which captures a
+%%   local integer variable mutably in order to change its value through
+%%   addition. The closure is passed to another function and invoked, increasing
+%%   the variable's value by one. SMACK successfully verifies this example.
+%% \item The \texttt{gauss\_sum\_nondet.rs} test (shown in \Cref{fig:gausssum})
+%%   demonstrates range-based iteration and nondeterministic loop-bounds
+%%   to verify the identity $1+2+\cdots+b=b(b-1)/2$ is maintained.
+%% \end{itemize}
+
+% Our current tests utilizing dynamic memory are based on tests of the
+% modeled \texttt{SmackVec} class. The \texttt{SmackVec} class is
+% written in Rust, and is founded upon SMACK's models of
+% \texttt{malloc}, \texttt{realloc}, and \texttt{free}. The testing
+% programs test for basic basic vector behaviors ofthe
+% \texttt{SmackVec}, such as creation, dynamic resizing, no use after free,
+% and no memory leaks. %% \marek{Need to make a test for this.} The
+%% modeled \texttt{Vec} is generic over types and supports the index
+%% operator and iteration.
+Currently we do not support modular verification. In general,
+while SMACK supports modular verification to some extent,
+that has never been thoroughly tested and used.
+We should remove this paragraph.}
+The \texttt{incr\_test} example shows how cross language support can be
+achieved with SMACK. In this example, a Rust program transfers a
+pointer to a C function which increments the value contained in the
+pointer. This example demonstrates two things; first, a program
+written in one language which makes calls to a library written in
+another language can be verified by SMACK. Second, through assertions
+and assumptions a variation of design by contract can be achieved. In
+this example, the two source files can, in principle, be verified
+separately, by doing the following:
+\begin{itemize}
+\item The caller function asserts the precondition for the called function
+  prior to the function call.
+\item The called function assume its precondition, thereby making SMACK
+  only check executions which adhere to the precondition.
+\item Before the called function returns, the called function can make
+  assertions about its state corresponding to its postcondition.
+\item After the function call returns, the caller can make assumptions
+  corresponding to the the postcondition of the called
+  function.\marek{Update this example now that assume is available in
+    Rust.}
+\end{itemize}
+This approach can be used to make the SMACK verifier more scalable by
+verifying individual functions according to their pre- and
+postconditions. This improves performance as each function is verified
+in isolation, only assuming the function upholds its promised
+behavior.
+
+\zvon{I don't fully understand the purpose of this paragraph.
+The final example we examine is the \textit{information control flow}
+(IFC) benchmark from \cite{rust-safety17}. This example demonstrates a
+permission oriented way to implement access control of resources. The
+example demonstrates the power of Rust's alias-analysis and ownership
+systems to enforce systems level security. We extend the benchmark to
+assign bounded, nondeterministic access privileges to potential users.
+This example uses the \texttt{Vec} class, loops, and nondeterministic
+features. SMACK was used to verify the access protocol for IFC.

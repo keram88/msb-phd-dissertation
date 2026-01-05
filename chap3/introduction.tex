@@ -1,0 +1,180 @@
+\section{Introduction}
+\label{sec:vmcaiintroduction}
+
+%
+% why we need multi-language verification
+% 1. new langauges are coming up quickly
+% 2. software is written in multiple languages
+%
+The evolution of software systems motivates the need for new programming
+languages with novel features to better adapt to new programming goals, such as
+improving program safety or easing programming.
+%
+For example, Rust~\cite{rust-link} is a novel performant systems programming
+language with guaranteed memory safety and safer parallel programming.
+%
+The D programming language also aims to provide memory safety and high-level
+programming primitives, while maintaining performance and low-level programming
+capabilities.
+%
+Swift and Kotlin employ modern programming language concepts to reduce language
+verbosity and allow for easier programming.
+%
+On the other hand, there are legacy languages that are still widely used in
+certain domains.
+%
+For example, Fortran dominates as a programming language of choice among
+domain scientists, such as physicists and chemists.
+%
+To further complicate matters, developers typically build real-world software
+systems using a combination of several programming languages by implementing
+various components in different languages depending on the requirements and
+trade-offs.
+
+
+%
+% why we need verification
+%
+Software verification is integral to improving software quality.
+%
+Among software verification techniques, the ones based on
+\emph{satisfiability modulo theories} (SMT) have become increasingly popular due
+to its rigor, automation, and tremendous scalability improvements of the past
+two decades.
+%
+There are numerous SMT-based tools available with various capabilities,
+features, and trade-offs
+(e.g.,~\cite{Albarghouthi2012,gravy,joogie,calysto,divine,Beyer2011,klee,tacas2007-clqr,satabs,ClarkeKL04,vcc,esbmc,framac,DBLP:conf/icfem/FilliatreM04,Heizmann2013,llbmc,symbc,smack-cav,civl,cascade}).
+%
+%including
+%Caduceus~\cite{DBLP:conf/icfem/FilliatreM04},
+%Calysto~\cite{calysto},
+%Cascade~\cite{cascade},
+%CBMC~\cite{ClarkeKL04},
+%CPAchecker~\cite{Beyer2011},
+%ESBMC~\cite{esbmc},
+%Frama-C~\cite{framac},
+%GraVy~\cite{gravy},
+%HAVOC~\cite{tacas2007-clqr},
+%Joogie~\cite{joogie},
+%KLEE~\cite{klee},
+%LLBMC~\cite{llbmc},
+%SATABS~\cite{satabs},
+%Symbolic PathFinder~\cite{symbc},
+%TASS~\cite{tass},
+%UFO~\cite{Albarghouthi2012},
+%and VCC~\cite{vcc}.
+%
+However, the traditional way to prototype a program verifier, by implementing
+all of its components (e.g., front-end, SMT formula generator) from scratch, is
+extremely time-consuming and heavily coupled with target language details.
+%
+Hence, despite widespread usage of many programming languages and their
+combinations, automatic software verifiers still predominantly target the C
+programming language, thereby denying many developers a valuable tool for
+ensuring safety and reliability of their programs.
+%
+It would be ideal if program verifiers can keep pace with the development of
+emerging programming languages such that users can benefit from this rigorous
+software analysis technique.
+
+
+%
+% introduce LLVM
+%
+LLVM~\cite{lattner2004llvm} is a popular, open source compiler
+infrastructure, which features an assembly-like intermediate compiler
+representation, known as the LLVM intermediate representation (IR).
+%
+LLVM IR has been leveraged to build program
+verifiers~\cite{smack-cav,seahorn,llbmc}, since LLVM IR frees the verifier
+designer from the error prone tasks of modeling the semantics and parsing of
+the source language~\cite{smack-cav}.
+%
+In theory, a well-designed verifier targeting LLVM IR should be able to support
+any programming language that has a compiler front-end capable of emitting LLVM
+IR, as well as their combinations.
+%
+However, to the best of our knowledge, verifiers built upon LLVM IR only
+support C/C++, and there has been no systematic study exploring how well such
+verifiers extend to support other programming languages.
+%
+This is despite the fact that compilers for other programming languages can
+produce LLVM IR, such as the Rust compiler and the Flang 
+compiler~\cite{flang-link} for Fortran.
+
+
+The goal of this chapter is to investigate the feasibility of multi- and
+cross-language verification that leverages an intermediate compiler
+representation (e.g., LLVM IR).
+%
+We chose to use SMACK~\cite{smack-cav,smack-web} as an exemplar mature verification
+toolchain based on LLVM IR.
+%
+For more information about SMACK please see \cref{sec:smackground}.
+%
+As our first step, we prescribe a procedure for adding a new language to such
+a tool chain, consisting of interoperating with language models, compiling into
+IR, and adding models for missing language features.
+%
+Then, we evaluate our procedure by prototyping in SMACK support for 6
+additional programming languages with compilers capable of emitting LLVM IR.
+%
+Since SMACK is an LLVM IR-based verifier with extensive, preexisting support for
+the C programming language, it is a good basis for building a verifier for a new
+language.
+%
+Additionally, the modular design of SMACK is a desirable feature due to its
+decoupling of source language details from the verification task through LLVM
+IR.
+
+
+We performed several empirical case studies based around multi- and
+cross-language verification.
+%
+To this end, we created a microbenchmark suite that tests support for key
+language features such as dynamic dispatch.
+%
+We also explore cross-language verification using an example that exercises the
+interaction between Rust, Fortran, and C code.
+%
+This is an important task as many new programming languages include a facility
+to invoke C functions natively to support legacy code.
+%
+We summarize our experience and lessons learned.
+%
+We observe that depending on features present in a programming language, SMACK
+may not always work out-of-the-box.
+%
+This is due to either SMACK not supporting certain LLVM IR patterns or lack of
+suitable models for the standard libraries and runtime.
+%
+We discuss the process of improving SMACK's support for various LLVM IR
+patterns, which involves modeling additional IR instructions.
+%
+We also describe how we provide basic models for standard libraries and
+runtimes for several languages we added.
+
+
+To summarize, our main contributions are as follows:
+%
+\begin{itemize}
+%
+\item We prescribe a procedure by which support for new programming languages
+can be added to an IR-based software verifier.
+%
+\item By following our procedure, we added basic multi-language support to
+the SMACK software verifier for 6 additional programming languages: C++,
+Objective-C, D, Fortran, Swift, and Kotlin. We also made the preexisting
+support for Rust more robust, and hence we include it in our evaluation.
+%
+\item We developed a suite of microbenchmarks for testing the
+robustness of multi-langu\-age verification, which implements key language
+features across all of the additional languages.
+%
+\item We performed several multi- and cross-language case studies using SMACK,
+and we report on our experience and lessons learned in the process to guide
+future efforts in this area.
+%
+\end{itemize}
+

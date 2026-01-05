@@ -1,0 +1,456 @@
+\section{Case Studies}
+
+We perform three case studies to assess the feasibility and ease of adding
+support for an additional input programming language into an IR-based
+software verification toolchain such as SMACK.
+%
+Before we describe each case study in detail, we provide our strategy for
+selecting input programming languages we attempted to support.
+
+
+
+\subsection{Choice of Input Programming Languages}
+
+
+
+%
+% how did we choose the ones we did?
+%
+There are numerous programming languages in existence today, and clearly it
+would be infeasible for us to handle all of them.
+%
+Hence, for our case studies, we used the following criteria for choosing which
+languages to add support for in SMACK.
+%
+First, we selected popular languages from the Stack Overflow Developer
+Survey~\cite{devsurvey} that can be compiled down into LLVM IR.
+%
+Second, we performed a thorough search for other languages that can be compiled
+into LLVM IR, and are important in certain domains but less popular overall
+(i.e., domain specific).
+%
+Then, we prune this list based on our requirements on the front-end, which are
+as follows:
+%
+\begin{enumerate}
+  \item Compile input programs into LLVM IR \emph{Ahead-of-Time}
+  \item Target the same version of LLVM as SMACK
+  \item Be stable and under active development
+\end{enumerate}
+%
+\cref{tab:languages} lists the languages we considered and their relevant
+properties.
+
+
+As SMACK directly translates an entire program from LLVM to Boogie, it requires
+all related definitions to be available at translation time.
+%
+A \emph{Just-in-Time} compiler does not have a whole program readily
+available in the LLVM IR format for SMACK to process.
+%
+Therefore, \emph{Ahead-of-Time} compilers are the only ones that can
+currently be used with SMACK.
+%
+LLVM does not preserve backwards compatibility of the LLVM IR format.
+%
+Hence, the LLVM version supported by SMACK and the chosen language front-end
+have to match.
+%
+The used version of SMACK supports LLVM 3.9, and hence our requirement is
+for a language front-end to support the same LLVM version.
+%
+We sometimes had to revert to an older front-end version to satisfy this
+requirement.
+%
+For example, Swift 4.2 does not target the required LLVM 3.9, but Swift 3.0
+does.
+%
+Of course, as SMACK gets updated to newer LLVM versions, this requirement will
+change as well.
+%
+In order to limit our focus to compilers of practical value, we ignore the ones
+that are not stable and under active development.
+
+
+Of the LLVM IR-based languages in the developer survey, there are 4 that
+satisfy our criteria: C, C++, Objective-C, and Swift.
+%
+Kotlin, Scala~\cite{scala-link}, and C\#~\cite{llilc}) have compilers that are
+not yet fully mature, but are stable and under active development.
+%
+We chose Kotlin as the representative of this ``managed language into LLVM IR''
+category.
+%
+In addition to the popular languages listed on  Stack Overflow, there are other
+notable, stable languages that target LLVM.
+%
+Most of these are tailored for domain-specific coding. 
+%
+The Rust programming language~\cite{rust-link} is a performant systems language
+with an emphasis on safety and concurrency. 
+%
+The D programming language~\cite{d-link} is a mature language which offers
+low-level control combined with high-level abstractions.
+%
+Both Rust and D target the systems programming community.
+%
+Fortran is primarily used in the scientific programming community, since it
+provides support for parallel processing and compatibility with legacy code for
+projects that span multiple decades.
+%
+The only language we do not use which satisfies our criteria is Haskell.
+%
+Its LLVM back-end is not compatible with SMACK, mainly because the entry point
+for the code is not included in a standalone bitcode file.
+
+
+
+\subsection{Case Study 1: Microbenchmarks}
+
+
+
+
+
+We developed a microbenchmark suite to evaluate the quality of the support for
+different languages we implemented in SMACK.
+%
+We crafted each benchmark to exercise across all languages (8 languages total,
+see \cref{tab:languages}) a specific language feature we deem important,
+meaning that a benchmark consists of a number of programs, each implementing
+the chosen feature in a different language.
+%
+In addition, we injected a property to be verified into each benchmark using
+assertions.
+%
+Hence, there are several (at least two) program versions per each
+benchmark-language pair: a passing version (i.e., no failing assertions) and a
+failing version (i.e., a failing assertion) for each assertion.
+%
+\cref{fig:microbenchmark} shows several variations of one of our
+microbenchmarks.
+%
+\cref{tab:vmcaibenchmarks} gives basic characteristics of our microbenchmark
+suite.\footnote{We made our microbenchmark suite publicly available at
+\url{https://github.com/soarlab/gandalv}.}
+
+
+We designed the microbenchmarks to be as small as possible, and yet still test
+a particular language feature.
+%
+Hence, a failing benchmark is a good indicator of which feature is not properly
+supported by a verifier.
+%
+While our microbenchmarks are not based on real-world programs, since they
+focus on common and widely-used language features, being able to handle them is
+a prerequisite to verifying real-world code.
+%
+One can think of our microbenchmarks as being \emph{litmus tests} for various
+key language features.
+
+
+Not all benchmarks have a program version for every language since not all
+language features are supported across the board.
+%
+For example, languages without support for object-oriented programming (e.g.,
+C, Fortran) do not have versions of the corresponding benchmark (i.e.,
+method).
+%
+Then, Swift and Kotlin do not have syntactic support for pointers, and so we
+could not implement versions of the pointer benchmark for these languages.
+%
+We also sometimes had to implement benchmark versions differently across
+languages.
+%
+For example, we implemented the dynamic dispatch benchmark in Rust using
+\emph{traits} instead of inheritance.
+%
+As another example, we implemented the inout benchmark in Swift and Fortran
+using a specific mutable-parameter syntax, while in most other languages we
+replicate this feature using pointers.
+%
+We did not implement this benchmark in Kotlin since it has no support for
+pointers, nor for mutable-parameter syntax.
+
+
+%Language features, such as
+%for loops, may be very different across languages. In the case of for loops,
+%there are a few languages (e.g. C, C++) which only use the C-style for loop,
+%a few languages which only use the modern for loop (e.g. Swift), and some that
+%provide both options (e.g. Objective-C). These benchmarks test the versatility
+%of a verifier with respect to certain features.
+%
+%For SMACK, there is the added complexity of using compiled LLVM-IR. Different
+%langauges compile, say, for loops in different ways. For example, Kotlin and
+%Swift both use range objects to compile for loops. However, Kotlin compiles it's
+%range object into LLVM, while Swift uses a standard library class. 
+
+
+
+
+
+\cref{tab:results} summarizes the results of running SMACK with our
+extensions on the microbenchmarks.
+%
+Overall, SMACK successfully discharges all available program versions of
+benchmarks in C, Fortran, and Rust.
+%
+For C++ and D, the main missing language feature that we still have to add
+support for is dynamic dispatch.
+%
+Swift, Objective-C, and Kotlin need more work before SMACK could support
+language features beyond just the very basic ones.
+%
+The primary cause for the failing benchmarks is SMACK lacking models of
+standard libraries and runtime.
+
+
+Swift, Objective-C, Kotlin, and Rust are all very library- and
+runtime-depen\-dent.
+%
+Hence, there are many basic language features that SMACK does not capture
+precisely (i.e., that are not modeled in SMACK), which causes even some small
+benchmarks to fail.
+%
+As we note in \cref{sec:large-runtimes}, developing such models for a
+verifier is typically a tedious manual process, and is an exercise we could not
+perform for all languages in the limited amount of time we had for our case
+study.
+%
+%In our previous work~\cite{atva-paper}, we describe our experience of
+%implementing models of several popular Rust standard library functions, which
+%we used in this work as well.
+However, the version of SMACK we used already contained models
+of several popular Rust standard library functions.
+%
+Hence, in our experiments, the other three languages have more failing
+benchmarks than Rust, which are caused by the following unmodeled
+functionality:
+%
+\begin{itemize}
+  \item \textbf{Swift} range structures (forloop), array subscripts (array), dispatching functions via function pointers (method)
+  \item \textbf{Obj-C} objc-msg-send for dispatching methods via function pointers (compound, method), NSArray class (array)
+  \item \textbf{Kotlin} dynamic object instantiation (compound, array)
+\end{itemize}
+		
+%\subsubsection{Vtables}
+%
+%SMACK currently does not support the use of Vtables for dynamic dispatch. Because
+%of this, it cannot tell between different overrides of the same method in
+%different classes. Every language which supports objects and inheritence thus
+%fails the dynamic benchmark. 
+%
+%However, Rust uses a different method to accomplish dynamic dispatch, so its
+%benchmark is properly supported.
+
+
+\subsection{Case Study 2: Adding a Language}
+
+
+
+In order to get a rough estimate of the time commitment required to add support
+for a new language to an IR-based verifier, we conducted an informal timed
+exercise where an undergraduate student working on this project (Jack
+J.~Garzella, one of the coauthors) added support for one additional language,
+the D programming language, to SMACK.
+%
+During the exercise, the student followed the steps we prescribe in our procedure from
+\cref{sec:procedure}, and we measured elapsed time (in hours) it took him
+to accomplish each of the steps.
+%
+\cref{tab:d-exercise} summarizes our measurements.
+
+
+The student had no experience with D beyond implementing the microbenchmarks;
+he was also not familiar with the SMACK internals, which ended up not being
+important for this exercise since no changes to SMACK were needed.
+%
+However, as D was the sixth programming language the student added, he had
+ample experience adding support for new languages, which contributed to this
+exercise proceeding smoothly.
+%
+Furthermore, D was an easy language to add since the LLVM IR it generates is
+close to the one generated by the C clang compiler, and hence heavily tested
+with SMACK.
+%
+In addition, basic code in D does not heavily depend on its standard library
+and runtime.
+%
+Hence, the student spent very little time modeling missing functions for D.
+%
+For languages with extensive usage of standard libraries and runtime (e.g.,
+Swift, Kotlin), we expect that modeling the runtime and standard library
+functionality to dominate the total time.
+
+
+
+\subsection{Case Study 3: Cross-Language Verification}
+
+%\begin{lstlisting}[language=C,basicstyle=\ttfamily\scriptsize, commentstyle=\color{green},frame=lines,numberstyle=\tiny]
+%void order(int * a, int *b, int *c) {
+%  if (*a > *b) {
+%    int tmp = *a;
+%    *a = *b;
+%    *b = tmp;
+%  }
+%  if (*b > *c) {
+%    int tmp = *b;
+%    *b = *c;
+%    *c = tmp;
+%  }
+%  if (*a > *b) {
+%    int tmp = *a;
+%    *a = *b;
+%    *b = tmp;
+%  }
+%}
+%
+%int classify_triangle_sides_c(int s1, int s2, int s3) {
+%  int *a = &s1;
+%  int *b = &s2;
+%  int *c = &s3;
+%
+%  order(a,b,c);
+%
+%  if (*a == *b && *b == *c) { // equilateral
+%    return 0;
+%  } else if (*a == *b || *b == *c) { // iscoseles
+%    return 1;
+%  } else { // scalene
+%    return 2;
+%  }
+%}
+%\end{lstlisting}
+
+One of the major advantages to the IR-based approach to verification is the
+ease of cross-language verification. 
+%
+In fact, with the approach that SMACK takes, every verification (of a non-C
+language) is a cross-language verification, as SMACK's models that have to be
+linked against the input program are written in C.
+%
+With this in mind, non-trivial cross-language verification efforts are
+typically as simple as any regular single-language verification.
+%
+As a proof of this concept, we took a simple algorithm, namely a classic
+triangle classifier, and implemented it in C, Rust, and Fortran.
+%
+Our triangle classifier takes 3 integers as input, which represent the sides of
+a triangle, and it determines and returns the type of the triangle defined by
+the input sides.
+%
+We wrote a harness program that invokes triangle classifiers from
+each language in turn, feeds equal nondeterministic inputs to all of them, and
+asserts that they return the same result.
+%
+Hence, we performed cross-language verification to verify the equivalence of
+our implementations in all three languages.
+%
+SMACK was able to verify the equivalence (i.e., the harness program) in around
+19 seconds.
+%
+We expect such cross-language equivalence checking to be a valuable tool for
+developers when rewriting legacy applications in, for example Fortran or C,
+into more modern languages, such as C++ or Rust.
+
+
+% \begin{table}[tb]
+% \caption[Equivalence checking of half-precision floating-point
+%   implementations in C and Rust]{Equivalence checking of half-precision floating-point
+%   implementations in C and Rust.
+%   % 
+% %  Column \textbf{Function} shows the methods of Rust \textit{f16} type.
+%   %
+%   Column \textbf{Equal?} shows whether the two implementations
+%   are equivalent;
+%   %
+%   column \textbf{Time} gives the verification runtime in seconds;
+%   %
+%   column \textbf{LOC} gives the number of lines of code in the checked Rust function.
+%   }
+%   \label{tab:rust-half}
+% \centering
+% \vspace{1em}
+% \setlength{\tabcolsep}{8pt}
+% \ra{1.75}
+% \begin{tabular}{@{}lcrr@{}}
+% \toprule
+% \textbf{Function} & \textbf{Equal?} & \textbf{Time(s)} & \textbf{LOC} \\
+% \midrule
+%   eq        & \cmark{} & 13 & 8 \\
+%   lt        & \cmark{} & 22 & 13 \\
+%   le        & \cmark{} & 18 & 13 \\
+%   gt        & \cmark{} & 17 & 13 \\
+%   ge        & \cmark{} & 18 & 13 \\
+% \hdashline[1pt/1pt]
+%   to\_f32   & \cmark{} & 8  & 41 \\
+%   to\_f64   & \cmark{} & 8 & 41 \\
+%   from\_f32 & \xmark{} & 5 & 68 \\
+%   from\_f64 & \xmark{} & 4 & 70 \\
+% \hdashline[1pt/1pt]
+%   is\_nan   & \cmark{} & 4 & 3\\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+
+We further push our cross-language verification case study to a real-world Rust
+application --- the \textit{half} crate~\cite{rust-half} that implements the
+half-precision floating-point type \lstrust{f16}.
+%
+We chose the \textit{half} crate because its implementation is compact in terms
+of code size (functions range from only a few to around 70 LOC, see
+\cref{tab:rust-half}), but difficult to reason about because it frequently
+performs low-level bit manipulations. 
+%
+Furthermore, the equivalence of functions implementing the half-precision
+floating-point type can be easily expressed.
+%
+This makes the \textit{half} crate a suitable target for our cross-language
+verification case study.
+
+
+For the purpose of this case study, we developed a simple C reference
+implementation of the half-precision floating-point type that leverages the
+available \lstc{__f16} type.
+%
+Then, we verify that several important representative methods of the
+\textit{half} crate, such as \lstrust{lt}, \lstrust{gt}, and \lstrust{to\_f32},
+are equivalent to the respective C implementations.
+%
+We leverage the Rust's \emph{Foreign Function Interface} to write harness
+programs that assert the equivalence between Rust and C functions.
+%
+(Note that if such a mechanism for interoperating between languages does not
+exist, we could implement the equivalence check at the LLVM IR level; however,
+working directly with the low-level LLVM IR would be more tedious.)
+%
+Thanks to Rust's high interoperability with C, we are able to trivially express
+equivalence using the equality operator.
+%
+For example, relational operators in C evaluate to 1 if the relation is true
+and otherwise they evaluate to 0.
+%
+In Rust, casting a value of type \lstrust{bool} into an integer has the same
+behavior.
+%
+Therefore, comparing a predicate function such as \lstrust{eq} in C and Rust
+reduces to checking if the return value of the C version is equal to the return
+value of the Rust version cast to type \lstrust{u8}.
+
+
+
+\cref{tab:rust-half} summarizes the results of this case study.
+%
+SMACK is able to verify that most of the chosen functions of the \lstrust{f16}
+type are equivalent to their reference C implementations.
+%
+The only exceptions are functions from\_f32 and from\_f64, for which SMACK
+discovered inconsistencies between the two implementations: conversions from
+larger bit-width floating-point types to \lstrust{f16} are rounded differently.
+%
+We reported this issue to the \textit{half} crate developers, and they
+confirmed and fixed it.
+%
+The verification runtimes range between 4--22 seconds on a 3.5GHz Intel 3770k
+machine.
+

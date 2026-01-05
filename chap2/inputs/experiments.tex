@@ -1,0 +1,35 @@
+
+We developed a benchmark suite containing various Rust language features
+to test the SMACK extensions we developed.
+\cref{tab:benchmarks} summarizes our benchmark suite.
+Every category includes both correct and buggy benchmark versions.
+Some notable included features are as follows:
+\begin{itemize}
+\item The closures category creates a closure that is passes to
+  another function.
+\item The generics category implements a generic trait for two
+  generic structures.  A statically dispatched function is then
+  invoked on the structures.
+\item The vector category tests dynamic resizing and indexing
+  of the Rust vector.
+\item The cross-language category contains Rust
+  programs that invoke C functions, including the \Cref{fig:crossfib} benchmark.
+\item The ifc category contains the \textit{information
+  flow control} (IFC) example from related \\ work~\cite{rust-safety17}. IFC models an
+  access control method where access authority can only be
+  increased. Using nondeterministic access levels, we verify that the
+  IFC Rust implementation only allows access to the appropriate
+  authority.
+\end{itemize}
+%
+Currently, SMACK verifies most benchmarks in under 20 minutes.
+The only exception is the full-blown IFC benchmark version that takes
+several hours to complete.
+%
+The development of the benchmark suite helped us to identify
+key language features that SMACK struggled with, and hence it guided our
+efforts.
+%
+We plan to make our benchmark suite publicly available to bootstrap
+the development of Rust verifiers.
+

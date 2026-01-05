@@ -1,0 +1,311 @@
+\section{Experience}
+
+In this section, we discuss our experience using our modified SMACK tool\-chain.
+%
+Name\-ly, the discovery of two bugs (one in the Rust math library and one in SMACK's math library) and an example experience using the SMACK extensions for equivalence checking.
+
+\subsection{Bug in the Rust \texttt{nextafter} Function}
+While performing equivalence checking between the \texttt{musl} and Rust implementations of the \texttt{nextafter} and \texttt{nextafterf} functions, we discovered an error in Rust's error detection.
+%
+We will focus on the double precision function \texttt{nextafter} which has the signature \texttt{fn nextafter(x: f64, y: f64) -\textgreater  f64} in Rust.
+%
+The behavior of this function is to return the next floating-point number after \texttt{x} in the direction of \texttt{y}, e.g., \texttt{nextafter(1.0, 2.0)} returns the smallest floating-point number greater than {\texttt 1.0} and \texttt{nextafter(1.0, 0.0)} returns the largest floating-point number less than \texttt{1.0}.
+
+The IEEE~754 standard for this function~\cite{nextafterieee} specifies error reporting in the case of overflow or underflow.
+%
+For example, consider the next floating point after \texttt{1.79E+308}\footnote{The full number is \texttt{1.7976931348623157E+308}.} in the direction of \texttt{inf}.
+%
+Since this is the largest, non-infinite floating point number, the result of \texttt{nextafter(1.79E+308, inf)} is \texttt{inf}.
+%
+In this situation, the result overflows and the standard says that this should raise the \texttt{FE\_INEXACT} and \texttt{FE\_UNDERFLOW} floating-point exceptions, which may be checked by the user upon return.
+
+We performed variable-wise, equivalence checking between the Rust and \texttt{musl} versions of this program.
+%
+When we checked the variable \texttt{e} that appears on line 3 of the two programs shown in~\cref{fig:nextaftercrs}, we found that the two programs diverged for some inputs.
+%
+This calculation is meant to calculate the exponent portion of the result in order to determine if underflow or overflow has occurred.
+%
+However, the calculation in the Rust version is functionally equivalent to \texttt{ux\_i \textgreater\textgreater (52 \& 0x7ff)}, which is effectively \texttt{ux\_i \textgreater\textgreater 52}.
+%
+This leaves the sign bit of the exponent intact.
+%
+The retained sign bit means that if the result is negative, the condition on line 6 of the Rust program will not detect overflow, meaning the computation on line 7 won't generate the requisite inexact and overflow flags.
+%
+We found a similar error in the calculation of the exponent in the 32-bit version of the function.
+%
+We reported this issue~\cite{nextafterissue} to the Rust developers and our fixes~\cite{nextafterpr} to this issue was merged into the library.
+
+An interesting aspect with respect to the Rust implementation is that currently
+Rust doesn't support accessing the floating-point environment, meaning
+floating-point exceptions can't currently be tested in the Rust implementation.
+%
+This lack of support means that the current tests in the Rust library are not
+testing that the correct floating-point exception is raised.
+%
+However, SMACK can show that there is a control flow divergence that would not
+be detected by the library's tests.
+%
+The current lack of testing means that if Rust supports the floating-point
+environment in at some future point, this incorrect code may be used assuming
+the code is correct.
+%
+Because SMACK does not rely on the floating-point environment and can analyze a
+programs logical control flow, it can find a bug that testing cannot currently
+find.
+
+% \begin{figure}[tbh]
+% \begin{minipage}{.50\textwidth}
+% \begin{lstlisting}[language=C, label={lst:nextafterc}, caption=nextafter in \texttt{musl}, style=boxed]
+% double nextafter(double x, double y) {
+%     ...
+%     e = ux.i >> 52 & 0x7ff;
+%     verifier_store(e,``musl_e'');
+%     /* raise overflow if ux.f is
+%     infinite and x is finite */
+%     if (e == 0x7ff)
+%         FORCE_EVAL(x+x);
+%     ...
+% }
+% \end{lstlisting}
+% \end{minipage}
+% \begin{minipage}{.50\textwidth}
+% \begin{lstlisting}[language=Rust, label={lst:nextafterrs}, caption=nextafter in Rust, style=boxed]
+% fn nextafter(x:f64, y:f64) {
+%     ...
+%     let e=ux_i.wrapping_shr(52&0x7ff);
+%     verifier_comp(e,``musl_e'');
+%     // raise overflow if ux.f is
+%     // infinite and x is finite
+%     if e == 0x7ff {
+%         force_eval!(x + x);
+%     }
+%     ...
+% }
+% \end{lstlisting}
+% \end{minipage}
+% \caption{An example of how SMACK found a control-flow divergence in the implementations for the {\tt nextafter} functions as implemented in C and Rust.}
+% \end{figure}
+
+\subsection{Bug in SMACK's Math Library}
+In the process of checking the SMACK library functions, we found a bug in SMACK's modeling of the \texttt{copysign} functions in the \texttt{fmod}~\cite{smackfmod} functions.
+%
+In \cref{lst:smackfmod}, Clang translates the call to \texttt{copysign} to the LLVM intrinsic function \texttt{@llvm.copysign.f32}.
+%
+SMACK translates this to an undefined uninterpreted-function in Boogie, as it does not model this intrinsic.
+%
+This means the SMACK library \texttt{fmod} function will return a nondeterministic value, so it is not equivalent to the Rust or \texttt{musl} implementations.
+%
+This does not apply to comparing the \texttt{copysign} functions in \texttt{musl} and Rust against SMACK since Clang does not modify SMACK's definition.
+%
+This bug has been submitted to the SMACK developers.
+
+% \begin{lstlisting}[language=C, label={lst:smackfmod}, caption=SMACK's fmod function, style=boxed, escapechar=`]
+% double fmod(double x, double y) {
+%   ...
+%   return copysign(ret, x);`\label{line:fmodcopysign}`
+% }
+% \end{lstlisting}
+
+\subsection{Verifying Advanced Functions}
+Here we describe our experiences verifying two functions from the advanced function category.
+\subsubsection{Verifying \texttt{k\_tanf}}
+The Rust libm function \texttt{k\_tanf}~(\cref{lst:rustktanf}) corresponds to the \texttt{\_\_kernel\_tandf}~(\cref{lst:muslktanf}) function from \texttt{musl} libm.
+%
+This function computes the tangent of \texttt{x} to 32-bit precision after range reduction.
+%
+This function computes intermediate results in 64-bit precision, then returns the final result rounded to 32-bit precision.
+%
+The function also does not use bit-wise operations.
+
+The function appears straightforward to verify at first; however, it takes more than an hour to check equivalence.
+%
+Because of the time to verify, this function qualifies for advanced techniques.
+%
+We applied the guided equivalence checking to verify this function.
+
+To start, we check equivalence of \texttt{r} at~\cref{line:ktanffirstcheck} in~\cref{lst:rustktanf}.
+%
+As expected, this check times out since it the same as checking the equivalence of the functions themselves.
+%
+We then add a check at~\cref{line:ktanfseccheck}, while disabling the original check.
+%
+This equality check can be verified in seconds.
+%
+We can then add additional checks as shown in~\cref{lst:rustktanf}.
+%
+While adding new checks, prior, verified checks can be converted to assumes.
+%
+This allows for the function to be verified incrementally, meaning the current check is the only one being verified.
+%
+This allows for feedback as to which checks are the most difficult, suggesting they need more work to verify.
+
+Finally, once all checks are completed, any assumed equivalence checks can be returned to being equivalence checks.
+%
+This allows the entire program to be checked without potentially adding faulty assumptions.
+%
+In this example, verification can be completed in 27.6s with Boogie as the verifier and Z3 as the solver.
+%
+This is similar to the total time taken to verify each check individually.
+
+% \begin{lstlisting}[language=Rust, label={lst:rustktanf}, caption=Annotated k\_tanf function from Rust libm, style=boxed, escapechar=`, float=tb]
+% fn k_tanf(x: f64, odd: bool) -> f32 {
+%     let z = x * x;
+%     verifier_equiv_check_f64(z);`\label{line:ktanfseccheck}`
+%     let mut r = T[4] + z * T[5];
+%     verifier_equiv_check_f64(r);
+%     let t = T[2] + z * T[3];
+%     verifier_equiv_check_f64(t);
+%     let w = z * z;
+%     verifier_equiv_check_f64(w);
+%     let s = z * x;
+%     verifier_equiv_check_f64(s);
+%     let u = T[0] + z * T[1];
+%     verifier_equiv_check_f64(u);
+%     r = (x + s * u) + (s * w) * (t + w * r);
+%     verifier_equiv_check_f64(r);`\label{line:ktanffirstcheck}`
+%     verifier_equiv_check_f64(-1. / r);
+%     (if odd { -1. / r } else { r }) as f32
+% }
+% fn main() {
+%     let x = 1.0f64.verifier_nondet();
+%     verifier_assume!(!x.is_nan());
+%     let y = 1i32.verifier_nondet();
+%     let bsd_res = unsafe { __kernel_tandf(x, y) };
+%     let rust_res = k_tanf(x, y != 1);
+%     verifier_assert!(bsd_res == rust_res);
+% }
+% \end{lstlisting}
+% \begin{lstlisting}[language=C, label={lst:muslktanf}, caption=Annotated \_\_kernel\_tandf function from \texttt{musl} libm, style=boxed, float=tb]
+% __kernel_tandf(double x, int iy)
+% {
+% 	double z,r,w,s,t,u;
+
+% 	z	=  x*x;
+% 	__VERIFIER_equiv_store_double(z);
+% 	r = T[4]+z*T[5];
+% 	__VERIFIER_equiv_store_double(r);
+% 	t = T[2]+z*T[3];
+% 	__VERIFIER_equiv_store_double(t);
+% 	w = z*z;
+% 	__VERIFIER_equiv_store_double(w);
+% 	s = z*x;
+% 	__VERIFIER_equiv_store_double(s);
+% 	u = T[0]+z*T[1];
+% 	__VERIFIER_equiv_store_double(u);
+% 	r = (x+s*u)+(s*w)*(t+w*r);
+% 	__VERIFIER_equiv_store_double(r);
+% 	__VERIFIER_equiv_store_double(-1.0/r);
+% 	if(iy==1) return r;
+% 	else return -1.0/r;
+% }
+% \end{lstlisting}
+
+\subsubsection{Additional Verification Techniques}
+Occasionally, checking equivalence at the variable level can be too slow.
+%
+The \texttt{acosf} function shown in \cref{lst:rustacosf} demonstrates such a case.
+%
+Here, the expression at~\cref{line:acosfretexp} times out during verification.
+%
+We can use a more advanced technique here and break the expression up by checking its sub-expressions.
+%
+On~\cref{line:acosfsubexp} we see that we can check the second part of the expression.
+%
+We can continue to do this until we get reasonable verification times for each step.
+%
+This helps the solver match up more of the sub-expressions, aiding in verification.
+%
+For this program, this reduced verification time from more than an hour to taking about 15 minutes.
+
+% \begin{lstlisting}[language=Rust, label={lst:rustacosf}, caption=Partially annotated acosf function from Rust libm, style=boxed, escapechar=`, float=tb]
+% fn acosf(x: f32) -> f32 {
+%     let mut hx = x.to_bits();
+%     let ix = hx & 0x7fffffff;
+%     ...
+%     /* |x| < 0.5 */
+%     if ix < 0x3f000000 {
+%         if ix <= 0x32800000 {
+%             /* |x| < 2**-26 */
+%             return PIO2_HI + x1p_120;
+%         }
+%         verifier_equiv_check_f32(r(x*x));
+%         verifier_equiv_check_f32(x*r(x*x));
+%         verifier_equiv_check_f32(PIO2_LO - x*r(x*x));
+%         verifier_equiv_check_f32(x-(PIO2_LO - x*r(x*x)));`\label{line:acosfsubexp}`
+%         verifier_equiv_check_f32(PIO2_HI-(x-(PIO2_LO - x*r(x*x))));
+%         return PIO2_HI - (x - (PIO2_LO - x * r(x * x)));`\label{line:acosfretexp}`
+%     }
+%     ...
+% }
+% \end{lstlisting}
+
+\subsection{Automatic Porting of C to Rust}
+There are tools such as \texttt{c2rust}~\cite{c2rust} which automatically translate C code into Rust code.
+%
+Such a tool can be used to save the labor of manually translating code, which can be time consuming and can be error prone.
+%
+While such a translated code is likely to be correct, we can apply SMACK to prove equivalence.
+
+% \begin{lstlisting}[language=C, label={lst:muslcopysign}, caption=Code for the \texttt{copysign} function from \texttt{musl}, style=boxed, escapechar=`, float=tb]
+% double copysign(double x, double y) {
+% 	union {double f; uint64_t i;} ux={x}, uy={y};
+% 	ux.i &= -1ULL/2;
+% 	ux.i |= uy.i & 1ULL<<63;
+% 	return ux.f;
+% }
+% \end{lstlisting}
+
+% \begin{lstlisting}[language=Rust, label={lst:c2rustcopysign}, caption=Automatic translation of the \texttt{copysign} function to Rust, style=boxed, escapechar=`, float=tb]
+% pub union C2RustUnnamed {
+%     pub f: c_double,
+%     pub i: c_ulong,
+% }
+% #[no_mangle]
+% pub unsafe extern "C" fn copysign(
+%     mut x: c_double,
+%     mut y: c_double,
+% ) -> c_double {
+%     let mut ux = C2RustUnnamed { f: x };
+%     let mut uy = C2RustUnnamed { f: y };
+%     ux.i = (ux.i as c_ulonglong
+%         & (1 as c_ulonglong)
+%             .wrapping_neg()
+%             .wrapping_div(2 as c_int as c_ulonglong)) as c_ulong;
+%     ux.i = (ux.i as c_ulonglong
+%         | uy.i as c_ulonglong & (1 as c_ulonglong) << 63 as c_int)
+%         as c_ulong;
+%     return ux.f;
+% }
+% \end{lstlisting}
+
+We now explore an example of applying \texttt{c2rust} to a function in the \texttt{musl} library.
+%
+The code for the \texttt{copysign} function from the \texttt{musl} library is shown in~\cref{lst:muslcopysign}, and its corresponding translation from \texttt{c2rust} is shown in \cref{lst:c2rustcopysign}.
+%
+We can apply SMACK to show these two programs are equivalent.
+%
+Once this equivalence has been shown, the C code can be replaced by the Rust code.
+%
+Because the translated Rust function uses the \textsc{\#[no\_mangle]} attribute, this code can also continue to be used by users of the C langaugae library.
+
+% \begin{lstlisting}[language=Rust, label={lst:rustcopysign}, caption=Idiomatic translation of \texttt{copysign} to Rust, style=boxed, escapechar=`, float=tb]
+% pub fn copysign(x: f64, y: f64) -> f64 {
+%     let mut ux = x.to_bits();
+%     let uy = y.to_bits();
+%     ux &= (-1i64 as u64)/2;
+%     ux |= uy & (1 << 63);
+%     f64::from_bits(ux)
+% }
+% \end{lstlisting}
+
+One disadvantage of using automatic translation is the code produced may not be idiomatic, nor readable, as seen in \cref{lst:c2rustcopysign}.
+%
+Because we have already shown the equivalence of the C and translated Rust codes, we can produce an equivalent, idiomatic function in Rust as shown in \cref{lst:rustcopysign}.
+%
+We can show that this function is equivalent to the one produced by \texttt{c2rust} and by transitivity its equivalence to the original \texttt{musl} code.
+%
+Because we are now checking equivalence of two programs written in Rust, there are more tools available to prove this equivalence because there is no need for multi-language support.
+
+Here we showed the role that automatic translation can play when porting a library to another programming language.
+%
+Using this approach, a library can be ported piece-by-piece, and a record of its equivalence to the old language can be maintained.
